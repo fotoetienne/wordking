@@ -27,14 +27,16 @@ Guess 0:
 t? e r? a s
 Guess 1:
 f r? u i t!
+```
 
+Wordking will provide a list of words to try next that incorporate the feedback on the words you've guessed thus far.
+
+```
 Valid letters: tr
 Invalid letters: easfui
 Known letters:     t
 Try: robot
 ```
-
-Wordking will provide a list of words to try next that incorporate the feedback on the words you've guessed thus far.
 
 ```
 Wordle 215 3/6*
