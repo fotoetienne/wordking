@@ -1,5 +1,6 @@
 use std::fs;
 use std::io;
+use itertools::Itertools;
 
 fn main() {
     println!("Provide your guesses thus far");
@@ -66,27 +67,46 @@ fn main() {
     }
 
     let known_letters = String::from_iter(known_letters);
+    let game_context = GameContext { invalid_letters, valid_letters, known_letters, wrong_place };
+    // let filtered = filter_words(get_words(), game_context);
+    // let suggestion = filtered.join("\n");
+    let ranked_guesses = rank_guesses(game_context);
+    let suggestion = ranked_guesses.iter()
+        .map(|(score, guess)|
+            guess.to_owned() + " "  + &*score.to_string()
+        )
+        .join("\n");
 
-    println!("Valid letters: {}", valid_letters);
-    println!("Invalid letters: {}", invalid_letters);
-    println!("Known letters: {}", known_letters);
-
-    let without_invalids = without_invalid_letter(get_words(), invalid_letters);
-    let with_valids = with_valid_letters(without_invalids, valid_letters);
-    let without_misplaced = with_known_letters(with_valids, known_letters);
-    let filtered = without_misplaced_letters(without_misplaced, wrong_place);
-
-    let suggestion = filtered.join("\n");
-
+    // println!("Valid letters: {}", valid_letters);
+    // println!("Invalid letters: {}", invalid_letters);
+    // println!("Known letters: {}", known_letters);
     println!("Try: {}", suggestion);
 }
 
+#[derive(Clone)]
+struct GameContext {
+    invalid_letters: String,
+    // letters we know are in the word
+    valid_letters: String,
+    // the letters that we know where they go
+    known_letters: String,
+    // for each slot, a list of chars that we know exist but are in the wrong place
+    wrong_place: Vec<String>,
+}
+
 fn get_words() -> Vec<String> {
-    fs::read_to_string("words.txt")
+    fs::read_to_string("wordle_short_list.txt")
         .expect("Unable to load word list")
         .split_whitespace()
         .map(|word| word.to_string())
         .collect()
+}
+
+fn filter_words(words: Vec<String>, game_context: GameContext) -> Vec<String> {
+    let without_invalids = without_invalid_letter(words, game_context.invalid_letters);
+    let with_valids = with_valid_letters(without_invalids, game_context.valid_letters);
+    let without_misplaced = with_known_letters(with_valids, game_context.known_letters);
+    return without_misplaced_letters(without_misplaced, game_context.wrong_place);
 }
 
 // Filter out words that contain invalid letters
@@ -127,4 +147,47 @@ fn without_misplaced_letters(words: Vec<String>, wrong_place: Vec<String>) -> Ve
                 !invalid_letters.contains(guessed_letter))
     )
         .collect::<Vec<String>>()
+}
+
+fn rank_guesses(game_context: GameContext) -> Vec<(usize, String)> {
+    let options = filter_words(get_words(), game_context.clone());
+    options.iter().map(|guess|
+        (score_guess(guess.to_string(), game_context.clone()), guess.to_string())
+    ).sorted().collect::<Vec<_>>()
+}
+
+// The guess score is the average of the possible options remaining
+fn score_guess(guess: String, game_context: GameContext) -> usize {
+    let options = filter_words(get_words(), game_context.clone());
+    return options.iter().map(|actual|
+        simulate_guess(actual.to_string(), guess.clone(), game_context.clone())
+    ).sum::<usize>();
+}
+
+// Given <actual> solution word, if <guess> is used, how many <options> remain?
+fn simulate_guess(actual: String, guess: String, game_context: GameContext) -> usize {
+    let post_guess_context = make_guess(actual, guess, game_context.clone());
+    let options = filter_words(get_words(), post_guess_context);
+    options.len()
+}
+
+// Update game_context based on a guess
+fn make_guess(actual: String, guess: String, mut game_context: GameContext) -> GameContext {
+    let mut known_letters = game_context.known_letters.chars().collect::<Vec<_>>();
+
+    for (i, (guess_char, actual_char)) in guess.chars().zip(actual.chars()).enumerate() {
+        if actual.contains(guess_char) {
+            if !game_context.valid_letters.contains(guess_char) {
+                game_context.valid_letters.push(guess_char);
+            }
+            if guess_char == actual_char {
+                known_letters[i] = guess_char;
+            }
+        } else if !game_context.invalid_letters.contains(guess_char) {
+            game_context.invalid_letters.push(guess_char);
+        }
+    }
+
+    game_context.known_letters = String::from_iter(known_letters);
+    game_context
 }
