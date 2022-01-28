@@ -160,14 +160,14 @@ fn rank_guesses(game_context: GameContext) -> Vec<(usize, String)> {
 fn score_guess(guess: String, game_context: GameContext) -> usize {
     let options = filter_words(get_words(), game_context.clone());
     return options.iter().map(|actual|
-        simulate_guess(actual.to_string(), guess.clone(), game_context.clone())
+        simulate_guess(actual.to_string(), guess.clone(), options.clone(), game_context.clone())
     ).sum::<usize>();
 }
 
 // Given <actual> solution word, if <guess> is used, how many <options> remain?
-fn simulate_guess(actual: String, guess: String, game_context: GameContext) -> usize {
+fn simulate_guess(actual: String, guess: String, word_list: Vec<String>, game_context: GameContext) -> usize {
     let post_guess_context = make_guess(actual, guess, game_context.clone());
-    let options = filter_words(get_words(), post_guess_context);
+    let options = filter_words(word_list, post_guess_context);
     options.len()
 }
 
